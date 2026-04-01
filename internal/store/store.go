@@ -1,58 +1,16 @@
 package store
-
-import (
-	"database/sql"
-	"fmt"
-	"os"
-	"path/filepath"
-
-	_ "modernc.org/sqlite"
-)
-
-type DB struct {
-	*sql.DB
-}
-
-func Open(dataDir string) (*DB, error) {
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		return nil, fmt.Errorf("mkdir: %w", err)
-	}
-	dsn := filepath.Join(dataDir, "barrage.db") + "?_journal_mode=WAL&_busy_timeout=5000"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open: %w", err)
-	}
-	db.SetMaxOpenConns(1)
-	if err := migrate(db); err != nil {
-		return nil, fmt.Errorf("migrate: %w", err)
-	}
-	return &DB{db}, nil
-}
-
-func migrate(db *sql.DB) error {
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS scenarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        target_url TEXT NOT NULL,
-        method TEXT NOT NULL DEFAULT 'GET',
-        headers TEXT,
-        body TEXT,
-        concurrency INTEGER NOT NULL DEFAULT 10,
-        duration_seconds INTEGER NOT NULL DEFAULT 30,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-     );
-     CREATE TABLE IF NOT EXISTS runs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        scenario_id INTEGER NOT NULL,
-        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        finished_at DATETIME,
-        total_requests INTEGER DEFAULT 0,
-        success_count INTEGER DEFAULT 0,
-        error_count INTEGER DEFAULT 0,
-        avg_latency_ms REAL DEFAULT 0,
-        p99_latency_ms REAL DEFAULT 0,
-        rps REAL DEFAULT 0,
-        status TEXT DEFAULT 'running'
-     );`)
-	return err
-}
+import("database/sql";"fmt";"os";"path/filepath";"time";_ "modernc.org/sqlite")
+type DB struct{*sql.DB}
+type Scenario struct{ID int64 `json:"id"`;Name string `json:"name"`;TargetURL string `json:"target_url"`;Method string `json:"method"`;Concurrency int `json:"concurrency"`;DurationSec int `json:"duration_seconds"`;CreatedAt time.Time `json:"created_at"`}
+type Run struct{ID int64 `json:"id"`;ScenarioID int64 `json:"scenario_id"`;ScenarioName string `json:"scenario_name,omitempty"`;StartedAt time.Time `json:"started_at"`;FinishedAt *time.Time `json:"finished_at"`;TotalReqs int `json:"total_requests"`;SuccessCount int `json:"success_count"`;ErrorCount int `json:"error_count"`;AvgLatMs float64 `json:"avg_latency_ms"`;P99LatMs float64 `json:"p99_latency_ms"`;RPS float64 `json:"rps"`;Status string `json:"status"`}
+func Open(dataDir string)(*DB,error){if err:=os.MkdirAll(dataDir,0755);err!=nil{return nil,fmt.Errorf("mkdir: %w",err)};dsn:=filepath.Join(dataDir,"barrage.db")+"?_journal_mode=WAL&_busy_timeout=5000";db,err:=sql.Open("sqlite",dsn);if err!=nil{return nil,fmt.Errorf("open: %w",err)};db.SetMaxOpenConns(1);if err:=migrate(db);err!=nil{return nil,fmt.Errorf("migrate: %w",err)};return &DB{db},nil}
+func migrate(db *sql.DB)error{_,err:=db.Exec(`CREATE TABLE IF NOT EXISTS scenarios(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,target_url TEXT NOT NULL,method TEXT DEFAULT 'GET',concurrency INTEGER DEFAULT 10,duration_seconds INTEGER DEFAULT 30,created_at DATETIME DEFAULT CURRENT_TIMESTAMP);CREATE TABLE IF NOT EXISTS runs(id INTEGER PRIMARY KEY AUTOINCREMENT,scenario_id INTEGER NOT NULL,started_at DATETIME DEFAULT CURRENT_TIMESTAMP,finished_at DATETIME,total_requests INTEGER DEFAULT 0,success_count INTEGER DEFAULT 0,error_count INTEGER DEFAULT 0,avg_latency_ms REAL DEFAULT 0,p99_latency_ms REAL DEFAULT 0,rps REAL DEFAULT 0,status TEXT DEFAULT 'running');`);return err}
+func(db *DB)ListScenarios()([]Scenario,error){rows,err:=db.Query(`SELECT id,name,target_url,method,concurrency,duration_seconds,created_at FROM scenarios ORDER BY created_at DESC`);if err!=nil{return nil,err};defer rows.Close();var out[]Scenario;for rows.Next(){var s Scenario;rows.Scan(&s.ID,&s.Name,&s.TargetURL,&s.Method,&s.Concurrency,&s.DurationSec,&s.CreatedAt);out=append(out,s)};return out,nil}
+func(db *DB)CreateScenario(s *Scenario)error{res,err:=db.Exec(`INSERT INTO scenarios(name,target_url,method,concurrency,duration_seconds)VALUES(?,?,?,?,?)`,s.Name,s.TargetURL,s.Method,s.Concurrency,s.DurationSec);if err!=nil{return err};s.ID,_=res.LastInsertId();return nil}
+func(db *DB)GetScenario(id int64)(*Scenario,error){s:=&Scenario{};err:=db.QueryRow(`SELECT id,name,target_url,method,concurrency,duration_seconds,created_at FROM scenarios WHERE id=?`,id).Scan(&s.ID,&s.Name,&s.TargetURL,&s.Method,&s.Concurrency,&s.DurationSec,&s.CreatedAt);if err==sql.ErrNoRows{return nil,nil};return s,err}
+func(db *DB)DeleteScenario(id int64)error{_,err:=db.Exec(`DELETE FROM scenarios WHERE id=?`,id);return err}
+func(db *DB)CreateRun(r *Run)error{res,err:=db.Exec(`INSERT INTO runs(scenario_id,status)VALUES(?,'running')`,r.ScenarioID);if err!=nil{return err};r.ID,_=res.LastInsertId();return nil}
+func(db *DB)FinishRun(r *Run)error{now:=time.Now();r.FinishedAt=&now;_,err:=db.Exec(`UPDATE runs SET finished_at=?,total_requests=?,success_count=?,error_count=?,avg_latency_ms=?,p99_latency_ms=?,rps=?,status='done' WHERE id=?`,now,r.TotalReqs,r.SuccessCount,r.ErrorCount,r.AvgLatMs,r.P99LatMs,r.RPS,r.ID);return err}
+func(db *DB)ListRuns()([]Run,error){rows,err:=db.Query(`SELECT r.id,r.scenario_id,COALESCE(s.name,''),r.started_at,r.finished_at,r.total_requests,r.success_count,r.error_count,r.avg_latency_ms,r.p99_latency_ms,r.rps,r.status FROM runs r LEFT JOIN scenarios s ON s.id=r.scenario_id ORDER BY r.started_at DESC LIMIT 50`);if err!=nil{return nil,err};defer rows.Close();var out[]Run;for rows.Next(){var r Run;rows.Scan(&r.ID,&r.ScenarioID,&r.ScenarioName,&r.StartedAt,&r.FinishedAt,&r.TotalReqs,&r.SuccessCount,&r.ErrorCount,&r.AvgLatMs,&r.P99LatMs,&r.RPS,&r.Status);out=append(out,r)};return out,nil}
+func(db *DB)CountScenarios()(int,error){var n int;db.QueryRow(`SELECT COUNT(*) FROM scenarios`).Scan(&n);return n,nil}
+func(db *DB)CountRuns()(int,error){var n int;db.QueryRow(`SELECT COUNT(*) FROM runs`).Scan(&n);return n,nil}
