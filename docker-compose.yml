@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  barrage:
+    build: .
+    ports:
+      - "9060:9060"
+    environment:
+      - PORT=9060
+      - DATA_DIR=/data
+      - BARRAGE_LICENSE_KEY=
+    volumes:
+      - barrage_data:/data
+    restart: unless-stopped
+volumes:
+  barrage_data:
