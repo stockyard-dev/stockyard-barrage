@@ -1,7 +1,7 @@
 package server
 import ("encoding/json";"log";"net/http";"github.com/stockyard-dev/stockyard-barrage/internal/store")
-type Server struct{db *store.DB;mux *http.ServeMux}
-func New(db *store.DB)*Server{s:=&Server{db:db,mux:http.NewServeMux()}
+type Server struct{db *store.DB;mux *http.ServeMux;limits Limits}
+func New(db *store.DB,limits Limits)*Server{s:=&Server{db:db,mux:http.NewServeMux(),limits:limits}
 s.mux.HandleFunc("GET /api/tests",s.listTests);s.mux.HandleFunc("POST /api/tests",s.createTest);s.mux.HandleFunc("GET /api/tests/{id}",s.getTest);s.mux.HandleFunc("DELETE /api/tests/{id}",s.deleteTest)
 s.mux.HandleFunc("POST /api/tests/{id}/run",s.runTest);s.mux.HandleFunc("GET /api/tests/{id}/runs",s.listRuns);s.mux.HandleFunc("GET /api/runs/{id}",s.getRun)
 s.mux.HandleFunc("GET /api/stats",s.stats);s.mux.HandleFunc("GET /api/health",s.health)
