@@ -1,27 +1,158 @@
 package server
+
 import "net/http"
-func(s *Server)dashboard(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","text/html; charset=utf-8");w.Write([]byte(dashHTML))}
-const dashHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Barrage</title>
-<style>:root{--bg:#1a1410;--bg2:#241e18;--bg3:#2e261e;--rust:#c45d2c;--rl:#e8753a;--leather:#a0845c;--cream:#f0e6d3;--cd:#bfb5a3;--cm:#7a7060;--gold:#d4a843;--green:#4a9e5c;--red:#c44040;--mono:'JetBrains Mono',Consolas,monospace;--serif:'Libre Baskerville',Georgia,serif}*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--cream);font-family:var(--mono);font-size:13px;line-height:1.6}.hdr{padding:.6rem 1.2rem;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}.hdr h1{font-family:var(--serif);font-size:1rem}.hdr h1 span{color:var(--rl)}.main{max-width:800px;margin:0 auto;padding:1rem}.btn{font-family:var(--mono);font-size:.68rem;padding:.3rem .6rem;border:1px solid;cursor:pointer;background:transparent}.btn-p{border-color:var(--rust);color:var(--rl)}.btn-p:hover{background:var(--rust);color:var(--cream)}.btn-s{border-color:var(--green);color:var(--green)}.btn-s:hover{background:var(--green);color:var(--bg)}.card{background:var(--bg2);border:1px solid var(--bg3);padding:.6rem;margin-bottom:.4rem;cursor:pointer;transition:.1s}.card:hover{background:var(--bg3)}.card h3{font-size:.8rem;margin-bottom:.15rem}.card-meta{font-size:.65rem;color:var(--cm);display:flex;gap:.7rem}.run-row{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-bottom:1px solid var(--bg3);font-size:.72rem}.run-stat{display:inline-flex;gap:.3rem;font-size:.65rem}.empty{text-align:center;padding:2rem;color:var(--cm);font-style:italic;font-family:var(--serif)}.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:100}.modal{background:var(--bg2);border:1px solid var(--bg3);padding:1.5rem;width:90%;max-width:500px}.modal h2{font-family:var(--serif);font-size:.9rem;margin-bottom:1rem}label.fl{display:block;font-size:.65rem;color:var(--leather);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem;margin-top:.5rem}input[type=text],input[type=number],select{background:var(--bg);border:1px solid var(--bg3);color:var(--cream);padding:.35rem .5rem;font-family:var(--mono);font-size:.78rem;width:100%;outline:none}.form-row{display:flex;gap:.5rem}.form-row>*{flex:1}</style>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-</head><body><div class="hdr"><h1><span>Barrage</span></h1><button class="btn btn-p" onclick="showNew()">+ Test</button></div>
-<div class="main"><div id="upgrade-banner" style="display:none;background:#241e18;border:1px solid #8b3d1a;border-left:3px solid #c45d2c;padding:.6rem 1rem;font-size:.78rem;color:#bfb5a3;margin-bottom:.8rem"><strong style="color:#f0e6d3">Free tier</strong> — 10 items max. <a href="https://stockyard.dev/barrage/" target="_blank" style="color:#e8753a">Upgrade to Pro →</a></div><div id="list"></div><div id="detail" style="display:none;margin-top:1rem"></div></div><div id="modal"></div>
+
+func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(dashHTML))
+}
+
+const dashHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Barrage</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1a1410;--bg2:#241e18;--bg3:#2e261e;--rust:#e8753a;--leather:#a0845c;--cream:#f0e6d3;--cd:#bfb5a3;--cm:#7a7060;--gold:#d4a843;--green:#4a9e5c;--red:#c94444;--blue:#5b8dd9;--mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--cream);font-family:var(--mono);line-height:1.5}
+.hdr{padding:1rem 1.5rem;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}.hdr h1{font-size:.9rem;letter-spacing:2px}.hdr h1 span{color:var(--rust)}
+.main{padding:1.5rem;max-width:960px;margin:0 auto}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem}
+.st{background:var(--bg2);border:1px solid var(--bg3);padding:.6rem;text-align:center}
+.st-v{font-size:1.2rem;font-weight:700}.st-l{font-size:.5rem;color:var(--cm);text-transform:uppercase;letter-spacing:1px;margin-top:.15rem}
+.toolbar{display:flex;gap:.5rem;margin-bottom:1rem;align-items:center}
+.search{flex:1;padding:.4rem .6rem;background:var(--bg2);border:1px solid var(--bg3);color:var(--cream);font-family:var(--mono);font-size:.7rem}
+.search:focus{outline:none;border-color:var(--leather)}
+.test{background:var(--bg2);border:1px solid var(--bg3);padding:.8rem 1rem;margin-bottom:.5rem;transition:border-color .2s}
+.test:hover{border-color:var(--leather)}
+.test-top{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem}
+.test-name{font-size:.85rem;font-weight:700}
+.test-url{font-size:.65rem;color:var(--cd);margin-top:.1rem}
+.test-config{font-size:.55rem;color:var(--cm);margin-top:.3rem;display:flex;gap:.6rem;flex-wrap:wrap}
+.test-actions{display:flex;gap:.3rem;flex-shrink:0}
+.method-badge{font-size:.5rem;padding:.12rem .35rem;text-transform:uppercase;letter-spacing:1px;border:1px solid;font-weight:700}
+.method-badge.GET{border-color:var(--green);color:var(--green)}.method-badge.POST{border-color:var(--blue);color:var(--blue)}.method-badge.PUT{border-color:var(--gold);color:var(--gold)}.method-badge.DELETE{border-color:var(--red);color:var(--red)}
+.run{background:var(--bg);border:1px solid var(--bg3);padding:.5rem .7rem;margin-top:.3rem;font-size:.6rem}
+.run-stats{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.2rem}
+.run-stat{display:flex;flex-direction:column;align-items:center}.run-stat-v{font-weight:700;font-size:.7rem}.run-stat-l{font-size:.45rem;color:var(--cm);text-transform:uppercase}
+.badge{font-size:.5rem;padding:.12rem .35rem;text-transform:uppercase;letter-spacing:1px;border:1px solid}
+.badge.running{border-color:var(--gold);color:var(--gold)}.badge.done{border-color:var(--green);color:var(--green)}.badge.failed{border-color:var(--red);color:var(--red)}
+.btn{font-size:.6rem;padding:.25rem .5rem;cursor:pointer;border:1px solid var(--bg3);background:var(--bg);color:var(--cd);transition:all .2s}
+.btn:hover{border-color:var(--leather);color:var(--cream)}.btn-p{background:var(--rust);border-color:var(--rust);color:#fff}
+.btn-sm{font-size:.55rem;padding:.2rem .4rem}
+.btn-run{border-color:var(--green);color:var(--green)}.btn-run:hover{background:var(--green);color:#fff}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center}.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--bg3);padding:1.5rem;width:500px;max-width:92vw;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:.8rem;margin-bottom:1rem;color:var(--rust);letter-spacing:1px}
+.fr{margin-bottom:.6rem}.fr label{display:block;font-size:.55rem;color:var(--cm);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem}
+.fr input,.fr select,.fr textarea{width:100%;padding:.4rem .5rem;background:var(--bg);border:1px solid var(--bg3);color:var(--cream);font-family:var(--mono);font-size:.7rem}
+.fr input:focus,.fr select:focus,.fr textarea:focus{outline:none;border-color:var(--leather)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem}
+.acts{display:flex;gap:.4rem;justify-content:flex-end;margin-top:1rem}
+.empty{text-align:center;padding:3rem;color:var(--cm);font-style:italic;font-size:.75rem}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.row2,.row3{grid-template-columns:1fr}}
+</style></head><body>
+<div class="hdr"><h1><span>&#9670;</span> BARRAGE</h1><button class="btn btn-p" onclick="openForm()">+ New Test</button></div>
+<div class="main">
+<div class="stats" id="stats"></div>
+<div class="toolbar"><input class="search" id="search" placeholder="Search tests..." oninput="render()"></div>
+<div id="tests"></div>
+</div>
+<div class="modal-bg" id="mbg" onclick="if(event.target===this)closeModal()"><div class="modal" id="mdl"></div></div>
 <script>
-async function api(u,o){return(await fetch(u,o)).json()}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function timeAgo(d){if(!d)return'';const s=Math.floor((Date.now()-new Date(d))/1e3);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';return Math.floor(s/3600)+'h ago'}
-async function load(){const d=await api('/api/tests');const tests=d.tests||[];
-document.getElementById('list').innerHTML=tests.length?tests.map(t=>'<div class="card" onclick="open_(\''+t.id+'\')"><h3>'+esc(t.name)+'</h3><div class="card-meta"><span>'+t.method+' '+esc(t.url)+'</span><span>'+t.concurrency+'c × '+t.requests+'r</span><span>'+t.run_count+' runs</span></div></div>').join(''):'<div class="empty">No load tests yet. Create one to start.</div>'}
-async function open_(id){const[t,rd]=await Promise.all([api('/api/tests/'+id),api('/api/tests/'+id+'/runs')]);
-const runs=(rd.runs||[]).map(r=>'<div class="run-row"><span style="color:'+(r.status==='done'?'var(--green)':'var(--gold)')+'">'+r.status+'</span><span class="run-stat"><b>'+r.total_requests+'</b>req</span><span class="run-stat" style="color:var(--green)">'+r.successes+'ok</span>'+(r.failures?'<span class="run-stat" style="color:var(--red)">'+r.failures+'fail</span>':'')+
-'<span class="run-stat">avg:'+r.avg_ms.toFixed(0)+'ms</span><span class="run-stat">p99:'+r.p99_ms.toFixed(0)+'ms</span><span class="run-stat" style="color:var(--gold)">'+r.req_per_sec.toFixed(1)+'rps</span><span style="color:var(--cm);font-size:.6rem">'+r.duration_ms+'ms</span></div>').join('');
-document.getElementById('detail').style.display='block';
-document.getElementById('detail').innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:.5rem"><span style="font-size:.75rem;color:var(--leather)">'+esc(t.name)+' — '+t.method+' '+esc(t.url)+'</span><div style="display:flex;gap:.3rem"><button class="btn btn-s" onclick="run_(\''+id+'\')">▶ Run</button><button class="btn" style="border-color:var(--bg3);color:var(--cm)" onclick="if(confirm(\'Delete?\'))del(\''+id+'\')">Del</button></div></div>'+(runs||'<div class="empty" style="padding:1rem">No runs yet.</div>')}
-async function run_(id){await api('/api/tests/'+id+'/run',{method:'POST'});setTimeout(()=>open_(id),2000);load()}
-async function del(id){await api('/api/tests/'+id,{method:'DELETE'});document.getElementById('detail').style.display='none';load()}
-function showNew(){document.getElementById('modal').innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h2>New Load Test</h2><label class="fl">Name</label><input type="text" id="nt-name" placeholder="Homepage load test"><label class="fl">URL</label><input type="text" id="nt-url" placeholder="https://example.com/api/health"><div class="form-row"><div><label class="fl">Method</label><select id="nt-method"><option>GET</option><option>POST</option><option>PUT</option></select></div><div><label class="fl">Concurrency</label><input type="number" id="nt-conc" value="10"></div><div><label class="fl">Total Requests</label><input type="number" id="nt-reqs" value="100"></div></div><div style="display:flex;gap:.5rem;margin-top:1rem"><button class="btn btn-p" onclick="save()">Create</button><button class="btn" style="border-color:var(--bg3);color:var(--cm)" onclick="closeModal()">Cancel</button></div></div></div>'}
-async function save(){const b={name:document.getElementById('nt-name').value,url:document.getElementById('nt-url').value,method:document.getElementById('nt-method').value,concurrency:parseInt(document.getElementById('nt-conc').value)||10,requests:parseInt(document.getElementById('nt-reqs').value)||100};if(!b.name||!b.url){alert('Name and URL required');return};await api('/api/tests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});closeModal();load()}
-function closeModal(){document.getElementById('modal').innerHTML=''}
-load()
-fetch('/api/tier').then(r=>r.json()).then(j=>{if(j.tier==='free'){var b=document.getElementById('upgrade-banner');if(b)b.style.display='block'}}).catch(()=>{var b=document.getElementById('upgrade-banner');if(b)b.style.display='block'});
+var A='/api',tests=[],runs={},editId=null;
+
+async function load(){
+var r=await fetch(A+'/tests').then(function(r){return r.json()});tests=r.tests||[];
+for(var i=0;i<tests.length;i++){
+var rr=await fetch(A+'/tests/'+tests[i].id+'/runs?limit=3').then(function(r){return r.json()}).catch(function(){return{runs:[]}});
+runs[tests[i].id]=rr.runs||[];
+}
+renderStats();render();
+}
+
+function renderStats(){
+var total=tests.length;
+var totalRuns=0;tests.forEach(function(t){totalRuns+=t.run_count||0});
+var totalReqs=0;Object.values(runs).forEach(function(rs){rs.forEach(function(r){totalReqs+=r.total_requests||0})});
+document.getElementById('stats').innerHTML=[
+{l:'Tests',v:total},{l:'Total Runs',v:totalRuns},{l:'Requests Sent',v:totalReqs>999?(totalReqs/1000).toFixed(1)+'k':totalReqs}
+].map(function(x){return '<div class="st"><div class="st-v">'+x.v+'</div><div class="st-l">'+x.l+'</div></div>'}).join('');
+}
+
+function render(){
+var q=(document.getElementById('search').value||'').toLowerCase();
+var f=tests;
+if(q)f=f.filter(function(t){return(t.name||'').toLowerCase().includes(q)||(t.url||'').toLowerCase().includes(q)});
+if(!f.length){document.getElementById('tests').innerHTML='<div class="empty">No load tests. Create one to get started.</div>';return;}
+var h='';f.forEach(function(t){
+h+='<div class="test"><div class="test-top"><div style="flex:1">';
+h+='<div class="test-name">'+esc(t.name)+'</div>';
+h+='<div class="test-url"><span class="method-badge '+t.method+'">'+t.method+'</span> '+esc(t.url)+'</div>';
+h+='</div><div class="test-actions">';
+h+='<button class="btn btn-sm btn-run" onclick="runTest(''+t.id+'')">&#9654; Run</button>';
+h+='<button class="btn btn-sm" onclick="openEdit(''+t.id+'')">Edit</button>';
+h+='<button class="btn btn-sm" onclick="del(''+t.id+'')" style="color:var(--red)">&#10005;</button>';
+h+='</div></div>';
+h+='<div class="test-config">';
+h+='<span>'+t.concurrency+' concurrent</span>';
+h+='<span>'+t.requests+' requests</span>';
+h+='<span>'+t.run_count+' runs</span>';
+h+='</div>';
+var tRuns=runs[t.id]||[];
+tRuns.forEach(function(r){
+h+='<div class="run"><div style="display:flex;justify-content:space-between;align-items:center">';
+h+='<span class="badge '+r.status+'">'+r.status+'</span>';
+h+='<span style="color:var(--cm)">'+ft(r.started_at)+'</span></div>';
+if(r.status==='done'){
+h+='<div class="run-stats">';
+h+='<div class="run-stat"><div class="run-stat-v" style="color:var(--green)">'+r.successes+'</div><div class="run-stat-l">OK</div></div>';
+h+='<div class="run-stat"><div class="run-stat-v" style="color:var(--red)">'+r.failures+'</div><div class="run-stat-l">Fail</div></div>';
+h+='<div class="run-stat"><div class="run-stat-v">'+r.avg_ms.toFixed(1)+'</div><div class="run-stat-l">Avg ms</div></div>';
+h+='<div class="run-stat"><div class="run-stat-v">'+r.p99_ms.toFixed(1)+'</div><div class="run-stat-l">P99 ms</div></div>';
+h+='<div class="run-stat"><div class="run-stat-v">'+r.req_per_sec.toFixed(0)+'</div><div class="run-stat-l">Req/s</div></div>';
+h+='<div class="run-stat"><div class="run-stat-v">'+(r.duration_ms/1000).toFixed(1)+'s</div><div class="run-stat-l">Duration</div></div>';
+h+='</div>';}
+h+='</div>';
+});
+h+='</div>';
+});
+document.getElementById('tests').innerHTML=h;
+}
+
+async function runTest(id){await fetch(A+'/tests/'+id+'/run',{method:'POST'});setTimeout(load,500);}
+async function del(id){if(!confirm('Delete this test and all runs?'))return;await fetch(A+'/tests/'+id,{method:'DELETE'});load();}
+
+function formHTML(test){
+var i=test||{name:'',url:'',method:'GET',headers:'',body:'',concurrency:10,requests:100};
+var isEdit=!!test;
+var h='<h2>'+(isEdit?'EDIT TEST':'NEW LOAD TEST')+'</h2>';
+h+='<div class="fr"><label>Name *</label><input id="f-name" value="'+esc(i.name)+'" placeholder="e.g. API health check"></div>';
+h+='<div class="row2"><div class="fr"><label>Method</label><select id="f-method">';
+['GET','POST','PUT','DELETE','PATCH'].forEach(function(m){h+='<option value="'+m+'"'+(i.method===m?' selected':'')+'>'+m+'</option>';});
+h+='</select></div><div class="fr"><label>URL *</label><input id="f-url" value="'+esc(i.url)+'" placeholder="https://api.example.com/health"></div></div>';
+h+='<div class="row2"><div class="fr"><label>Concurrency</label><input id="f-conc" type="number" value="'+i.concurrency+'"></div>';
+h+='<div class="fr"><label>Total Requests</label><input id="f-reqs" type="number" value="'+i.requests+'"></div></div>';
+h+='<div class="fr"><label>Headers (JSON)</label><textarea id="f-headers" rows="2" placeholder='{"Authorization":"Bearer ..."}'>'+ esc(i.headers)+'</textarea></div>';
+h+='<div class="fr"><label>Body</label><textarea id="f-body" rows="2" placeholder="Request body for POST/PUT">'+esc(i.body)+'</textarea></div>';
+h+='<div class="acts"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-p" onclick="submit()">'+(isEdit?'Save':'Create Test')+'</button></div>';
+return h;
+}
+
+function openForm(){editId=null;document.getElementById('mdl').innerHTML=formHTML();document.getElementById('mbg').classList.add('open');document.getElementById('f-name').focus();}
+function openEdit(id){var t=null;for(var j=0;j<tests.length;j++){if(tests[j].id===id){t=tests[j];break;}}if(!t)return;editId=id;document.getElementById('mdl').innerHTML=formHTML(t);document.getElementById('mbg').classList.add('open');}
+function closeModal(){document.getElementById('mbg').classList.remove('open');editId=null;}
+
+async function submit(){
+var name=document.getElementById('f-name').value.trim();
+var url=document.getElementById('f-url').value.trim();
+if(!name||!url){alert('Name and URL are required');return;}
+var body={name:name,url:url,method:document.getElementById('f-method').value,concurrency:parseInt(document.getElementById('f-conc').value)||10,requests:parseInt(document.getElementById('f-reqs').value)||100,headers:document.getElementById('f-headers').value.trim(),body:document.getElementById('f-body').value.trim()};
+if(editId){await fetch(A+'/tests/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
+else{await fetch(A+'/tests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
+closeModal();load();
+}
+
+function ft(t){if(!t)return'';try{var d=new Date(t);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}catch(e){return t;}}
+function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+load();
 </script></body></html>`
